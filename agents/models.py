@@ -16,6 +16,7 @@ class Tool(models.Model):
     )
     tool_name = models.CharField(
         max_length=255,
+        unique=True,
         help_text="The name of the tool."
     )
     tool_description = models.TextField(
