@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from users.models import User, Review
+from conversations.models import Conversation
 from agents.models import Agent, Tool
 from runs.models import RunInputFile, RunOutputArtifact, Run
 
@@ -22,6 +23,22 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 
 
+class ConversationSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    user_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        source='user',
+        write_only=True
+    )
+
+    class Meta:
+        model = Conversation
+        fields = ['conversation_id', 'user', 'user_id', 'title', 'created_at']
+        read_only_fields = ['conversation_id', 'created_at', 'title']
+
+    def create(self, validated_data):
+        validated_data['title'] = "New Chat"
+        return super().create(validated_data)
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -30,7 +47,6 @@ class ReviewSerializer(serializers.ModelSerializer):
     class Meta:
         model = Review
         fields = ['review_id', 'review_text', 'rating', 'created_at', 'user']
-
 
 
 class AgentSerializer(serializers.ModelSerializer):
@@ -74,3 +90,4 @@ class RunSerializer(serializers.ModelSerializer):
             'output_artifacts' 
         ]
         read_only_fields = ['id', 'status', 'final_output', 'input_files', 'output_artifacts']
+

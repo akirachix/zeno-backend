@@ -1,8 +1,8 @@
-
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, generics
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import authenticate
 from users.models import User, Review
 from .permissions import IsAdmin
@@ -11,6 +11,21 @@ from agents.models import Agent, Tool
 from .serializers import AgentSerializer,  RunInputFileSerializer, RunOutputArtifactSerializer, RunSerializer, ToolSerializer, UserSerializer, ReviewSerializer
 from runs.models import Run, RunInputFile, RunOutputArtifact 
 import threading
+from agents.models import Agent
+from conversations.models import Conversation
+from .serializers import UserSerializer, ReviewSerializer, AgentSerializer, ConversationSerializer
+from .permissions import IsAdmin
+from agents.models import Tool
+from .serializers import ToolSerializer
+
+
+
+class ConversationViewSet(viewsets.ModelViewSet):
+    serializer_class = ConversationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Conversation.objects.filter(user_id=self.request.user)
 
 class RegisterView(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
@@ -26,6 +41,7 @@ class RegisterView(viewsets.ViewSet):
                 'role': getattr(user, 'role', None)
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class LoginView(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
@@ -59,7 +75,7 @@ class LoginView(viewsets.ViewSet):
 
 
 class LogoutView(viewsets.ViewSet):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=['post'])
     def logout(self, request):
@@ -71,7 +87,6 @@ class LogoutView(viewsets.ViewSet):
 
 
 class ReviewViewSet(viewsets.ModelViewSet):
-    queryset = Review.objects.all()
     serializer_class = ReviewSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -85,18 +100,16 @@ class ReviewViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-    def delete(self, request, *args, **kwargs):
+    def destroy(self, request, *args, **kwargs):
         user = request.user
         if user.role.lower() != "admin":
             return Response({"error": "You do not have permission to delete reviews"}, status=status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
 
-
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated, IsAdmin]
-
 
 class AgentViewSet(viewsets.ModelViewSet):
     queryset = Agent.objects.all()
