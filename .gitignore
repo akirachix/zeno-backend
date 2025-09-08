@@ -9,12 +9,4 @@ venv/
 
 # Django database
 db.sqlite3
-
-# Environment variables
-.env
-
-.vscode/
-.idea/
-
-.history/
-.lh/
+__pycache__/
