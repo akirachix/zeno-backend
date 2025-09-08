@@ -6,10 +6,6 @@ __pycache__/
 env/
 venv/
 .venv/
-
-# Django database
-db.sqlite3
-__pycache__/
 .env
 
 .vscode/
@@ -17,3 +13,6 @@ __pycache__/
 
 .history/
 .lh/
+# Django database
+db.sqlite3
+
