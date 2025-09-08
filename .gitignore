@@ -10,3 +10,10 @@ venv/
 # Django database
 db.sqlite3
 __pycache__/
+.env
+
+.vscode/
+.idea/
+
+.history/
+.lh/
