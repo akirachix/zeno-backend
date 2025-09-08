@@ -10,7 +10,7 @@ from rest_framework import generics
 from agents.models import Agent, Tool
 from .serializers import AgentSerializer,  RunInputFileSerializer, RunOutputArtifactSerializer, RunSerializer, ToolSerializer, UserSerializer, ReviewSerializer
 from runs.models import Run, RunInputFile, RunOutputArtifact 
-
+import threading
 
 class RegisterView(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
@@ -111,6 +111,11 @@ class ToolViewSet(viewsets.ModelViewSet):
 
 
 class RunViewSet(viewsets.ViewSet):
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
     def create(self, request):
         user_input = request.data.get('user_input', '').strip()
         if not user_input:
@@ -141,13 +146,20 @@ class RunViewSet(viewsets.ViewSet):
         return Response(serializer.data, status=201)
         
     def list(self, request):
-        queryset = Run.objects.all()
+        user = request.user
+        if user.role.lower() == "admin":
+            queryset = Run.objects.all()
+        else:
+            queryset = Run.objects.filter(user=user)
         serializer = RunSerializer(queryset, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
         try:
             run = Run.objects.get(id=pk)
+            user = request.user
+            if user.role.lower() != "admin" and run.user != user:
+                return Response({'error': 'Not authorized to access this run'}, status=403)
             serializer = RunSerializer(run)
             return Response(serializer.data)
         except Run.DoesNotExist:
