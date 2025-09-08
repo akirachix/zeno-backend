@@ -9,7 +9,7 @@ from .views import (
     LoginView,
     LogoutView,
     AgentViewSet,
-    ToolViewSet
+    ToolViewSet,
     RunViewSet
 )
 

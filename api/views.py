@@ -5,19 +5,12 @@ from rest_framework.decorators import action
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from users.models import User, Review
-from .serializers import UserSerializer, ReviewSerializer
 from .permissions import IsAdmin
 from rest_framework import generics
-from agents.models import Agent
-<<<<<<< HEAD
-from .serializers import AgentSerializer
-from agents.models import Tool
-from .serializers import ToolSerializer
-=======
-from .serializers import AgentSerializer,  RunInputFileSerializer, RunOutputArtifactSerializer, RunSerializer
+from agents.models import Agent, Tool
+from .serializers import AgentSerializer,  RunInputFileSerializer, RunOutputArtifactSerializer, RunSerializer, ToolSerializer, UserSerializer, ReviewSerializer
 from runs.models import Run, RunInputFile, RunOutputArtifact 
 
->>>>>>> 9c2056a (Add runs app to zeno backend)
 
 class RegisterView(viewsets.ViewSet):
     permission_classes = [permissions.AllowAny]
