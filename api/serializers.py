@@ -1,5 +1,4 @@
 from rest_framework import serializers
-<<<<<<< HEAD
 from agents.models import Agent, Tool
 
 class AgentSerializer(serializers.ModelSerializer):
