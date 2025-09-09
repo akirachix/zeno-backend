@@ -13,34 +13,17 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
-def get_env_var(name):
-    value = os.environ.get(name)
-    if value is None or value.strip() == "":
-        raise Exception(f"Environment variable {name} is not set or is empty!")
-    return value
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+def env_set(*names):
+    return all(os.environ.get(name, "").strip() != "" for name in names)
 
 DJANGO_SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
-
-
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-
 SECRET_KEY = DJANGO_SECRET_KEY
-
-
 DEBUG = False
-
 ALLOWED_HOSTS = ["*"]
-
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -88,19 +71,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'zeno.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': get_env_var('PGDATABASE'),
-        'USER': get_env_var('PGUSER'),
-        'PASSWORD': get_env_var('PGPASSWORD'),
-        'HOST': get_env_var('PGHOST'),
-        'PORT': os.environ.get('PGPORT', '5432'),
-    }
-}
 
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+if env_set('PGDATABASE', 'PGUSER', 'PGPASSWORD', 'PGHOST'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ['PGDATABASE'],
+            'USER': os.environ['PGUSER'],
+            'PASSWORD': os.environ['PGPASSWORD'],
+            'HOST': os.environ['PGHOST'],
+            'PORT': os.environ.get('PGPORT', '5432'),
+        }
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -117,24 +106,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = 'static/'
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
