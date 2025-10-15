@@ -7,7 +7,7 @@ from conversations.models import Step
 
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True)
+    password = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = User
@@ -17,11 +17,11 @@ class UserSerializer(serializers.ModelSerializer):
             'last_name': {'required': True, 'allow_blank': False},
             'email': {'required': True, 'allow_blank': False},
         }
-
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User.objects.create_user(**validated_data, password=password)
         return user
+    
 
 class ConversationSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

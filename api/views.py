@@ -135,10 +135,11 @@ class ReviewViewSet(viewsets.ModelViewSet):
             return Response({"error": "You do not have permission to delete reviews"}, status=status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
 
-
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     def get_queryset(self):
         user = self.request.user
         role = getattr(user, 'role', '').lower()
