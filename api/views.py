@@ -34,6 +34,71 @@ MAX_CONVERSATIONS_PER_DAY = 5
 MAX_RUNS_PER_CONVERSATION_PER_DAY = 20
 
 
+import tempfile
+from PyPDF2 import PdfReader
+from PIL import Image
+import pytesseract
+import csv
+import pandas as pd
+from docx import Document
+
+def extract_text_from_file(file_obj):
+    """Extract text from PDF, image, CSV, Excel, Word, or plain text."""
+    try:
+        if file_obj.size > 10 * 1024 * 1024:  
+            return "[File too large for processing]"
+
+        file_name = file_obj.name.lower()
+        content_type = file_obj.content_type
+
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            for chunk in file_obj.chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
+
+        text = ""
+
+        
+        if content_type == "application/pdf" or file_name.endswith(".pdf"):
+            reader = PdfReader(tmp_path)
+            text = "\n".join(page.extract_text() or "" for page in reader.pages)
+
+       
+        elif content_type.startswith("image/") or file_name.endswith((".png", ".jpg", ".jpeg")):
+            image = Image.open(tmp_path)
+            text = pytesseract.image_to_string(image)
+
+        
+        elif file_name.endswith(".csv"):
+            df = pd.read_csv(tmp_path)
+            text = df.to_string(index=False)
+
+        
+        elif file_name.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(tmp_path)
+            text = df.to_string(index=False)
+
+  
+        elif file_name.endswith((".docx", ".doc")):
+            doc = Document(tmp_path)
+            text = "\n".join(paragraph.text for paragraph in doc.paragraphs)
+
+    
+        elif file_name.endswith(".txt") or content_type.startswith("text/"):
+            with open(tmp_path, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+
+        else:
+            return f"[Unsupported file type: {file_name}]"
+
+        os.unlink(tmp_path)
+        return text.strip()[:5000]  
+
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        return f"[Extraction failed: {str(e)}]"
+
 class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
@@ -225,9 +290,19 @@ class RunViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         user_input = request.data.get('user_input', '').strip()
         conversation_id = request.data.get('conversation_id', None)
-        if not user_input:
-            return Response({'error': 'user_input required'}, status=400)
 
+    
+        extracted_texts = []
+        uploaded_files = request.FILES.getlist('files')
+    
+        for file in uploaded_files:
+            text = extract_text_from_file(file)
+            if text and not text.startswith("["):
+                extracted_texts.append(text)
+
+        file_context = "\n\n--- DOCUMENT BREAK ---\n\n".join(extracted_texts) if extracted_texts else None
+
+   
         conversation = None
         if conversation_id:
             try:
@@ -254,8 +329,12 @@ class RunViewSet(viewsets.ModelViewSet):
             status=Run.PENDING
         )
 
-        for file in request.FILES.getlist('files'):
+        for file in uploaded_files:
             RunInputFile.objects.create(run=run, file=file)
+
+        if file_context:
+            run.final_output = f"__FILE_CONTEXT__:{file_context}"
+            run.save(update_fields=['final_output'])
 
         threading.Thread(target=self.simulate_status, args=(run.id,)).start()
 
@@ -287,10 +366,20 @@ class RunViewSet(viewsets.ModelViewSet):
             run.status = Run.RUNNING
             run.save(update_fields=['status'])
 
+            file_context = None
+            if run.final_output and run.final_output.startswith("__FILE_CONTEXT__:"):
+                file_context = run.final_output[len("__FILE_CONTEXT__:"):]
+                run.final_output = None
+                run.save(update_fields=['final_output'])
+
+            payload = {"query": run.user_input}
+            if file_context:
+                payload["file_context"] = file_context
+
             try:
                 response = requests.post(
                     ZEN_AGENT_API_URL,
-                    json={"query": run.user_input},
+                    json=payload,
                     timeout=30
                 )
                 response.raise_for_status()
@@ -302,20 +391,20 @@ class RunViewSet(viewsets.ModelViewSet):
                 return
 
             query_type = result.get("type", "rag")
-            
+        
             if query_type == "forecast":
                 forecast_display = result.get("forecast_display", "Forecast data unavailable")
                 interpretation = result.get("interpretation", "No interpretation available")
                 confidence_level = result.get("confidence_level", "Medium")
                 data_points = result.get("data_points_used", 0)
-                
+            
                 agent_response = (
                     f"{interpretation}\n\n"
                     f"FORECAST SUMMARY:\n"
                     f"{forecast_display}\n"
                     f"Confidence Level: {confidence_level} ({data_points} data points used)"
                 )
-                
+            
                 dual_forecast = result.get("dual_forecast", {})
                 if dual_forecast:
                     RunOutputArtifact.objects.create(
@@ -324,13 +413,16 @@ class RunViewSet(viewsets.ModelViewSet):
                         data={"dual_forecast": dual_forecast},
                         title="Detailed Forecast Data"
                     )
-                    
+                
             elif query_type == "scenario":
                 agent_response = result.get("llm_analysis", "No scenario analysis available.")
-                
+            
             elif query_type == "comparative":
                 agent_response = result.get("response", "No comparative analysis available.")
-                
+            
+            elif query_type == "file_analysis" or query_type == "file_query":
+                agent_response = result.get("response", "No response received.")
+            
             else:
                 agent_response = result.get("response", "No response received.")
 
@@ -366,7 +458,6 @@ class RunViewSet(viewsets.ModelViewSet):
 
         except Run.DoesNotExist:
             pass
-
     def destroy(self, request, *args, **kwargs):
         pk = kwargs.get('pk')
         try:
